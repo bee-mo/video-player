@@ -7,11 +7,11 @@
 #include <mutex>
 #include <pthread.h>
 
-#include <libavcodec/codec_id.h>
-#include <libavutil/avutil.h>
+// #include <libavcodec/codec_id.h>
+// #include <libavutil/avutil.h>
 #include <ffmpeg_extern.h>
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
+// #include <libavformat/avformat.h>
+// #include <libavcodec/avcodec.h>
 
 class Player;
 

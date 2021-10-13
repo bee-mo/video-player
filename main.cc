@@ -50,6 +50,9 @@ int main (int argc, char **argv) {
             } else {
                 player.load_file(tokens[1]);
             }
+        } else if (tokens[0].compare("exit") == 0) {
+            printf("Terminating Program.\n");
+            break;
         } else {
             printf("Unknown command [%s]\n", tokens[0].c_str());
         }
@@ -72,6 +75,8 @@ void handle_signal(int signal) {
 void help_prompt() {
     printf("-- [Help] --\n");
     printf("\tload <path_to_file>\tLoad a file into the video player.\n");
+
+    printf("\texit\t\tExit the program.\n");
 }
 
 std::vector<std::string> tokenize(const std::string& line) {

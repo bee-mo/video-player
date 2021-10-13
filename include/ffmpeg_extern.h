@@ -3,4 +3,6 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
 #include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
+#include <libavutil/imgutils.h>
 }

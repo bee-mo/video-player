@@ -162,68 +162,80 @@ void * play_video_thread (void* params) {
         AVPacket *packet = av_packet_alloc();
         AVFrame *frame = av_frame_alloc();
 
-        bool first_frame_saved {false};
+        // Initialize window here!
+
+        printf("\nBeginning Frame Extraction.\n");
+
         if (packet == nullptr || frame == nullptr) {
                fprintf(stderr, "Error: Failed to initialize packet or frame.\n");
         } else {
-            while (av_read_frame(
-                vid_params->player->format_ctx_,
-                packet
-            ) >= 0) {
 
-                if (packet->stream_index == vid_params->stream_index) {
+            uint8_t *video_data[4];
+            int video_linesize[4];
 
-                    // decode the packet into a frame
-                    int res = avcodec_send_packet(vid_params->codec_ctx, packet);
-                    if (res < 0) {
-                        fprintf(stderr, "Error while sending packet to decoder.\n");
-                    } else {
+            int video_data_size = av_image_alloc(
+                video_data, video_linesize,
+                640, 360, AV_PIX_FMT_RGB24, 1
+            );
+            if (video_data_size < 0) {
+                fprintf(stderr, "Error: Failed to initialize video image buffer.\n");
+            } else {
+                while (av_read_frame(
+                    vid_params->player->format_ctx_,
+                    packet
+                ) >= 0) {
 
-                        while (res >= 0) {
-                            res = avcodec_receive_frame(vid_params->codec_ctx, frame);
+                    if (packet->stream_index == vid_params->stream_index) {
 
-                            if (res == AVERROR(EAGAIN) || res == AVERROR_EOF) {
-                                break;
-                            } else if (res >= 0) {
-                                /* printf("Frame %d (size=%d bytes, format=%d) "
-                                    "pts %ld key_frame %d dts %d\n",
-                                    vid_params->codec_ctx->frame_number,
-                                    // av_get_picture_type_char(frame->pict_type),
-                                    frame->pkt_size,
-                                    frame->format,
-                                    frame->pts,
-                                    frame->key_frame,
-                                    frame->coded_picture_number); */
+                        // decode the packet into a frame
+                        int res = avcodec_send_packet(vid_params->codec_ctx, packet);
+                        if (res < 0) {
+                            fprintf(stderr, "Error while sending packet to decoder.\n");
+                        } else {
 
-                                // For now, just write the first frame into
-                                // a pgm file.
-                                if (!first_frame_saved) {
-                                    first_frame_saved = true;
-                                    FILE *f = fopen("first_frame.pgm", "w");
+                            while (res >= 0) {
+                                res = avcodec_receive_frame(vid_params->codec_ctx, frame);
 
-                                    // write the header of the file
-                                    fprintf(f, "P5\n%d %d\n%d\n",
-                                        frame->width, frame->height, 255);
-                                    for (int q = 0; q < frame->height; ++q) {
-                                        fwrite(frame->data[0] + q * frame->linesize[0],
-                                            1, frame->width, f);
+                                if (res == AVERROR(EAGAIN) || res == AVERROR_EOF) {
+                                    break;
+                                } else if (res >= 0) {
+                                    /* printf("Frame %d (size=%d bytes, format=%d) "
+                                        "pts %ld key_frame %d dts %d\n",
+                                        vid_params->codec_ctx->frame_number,
+                                        // av_get_picture_type_char(frame->pict_type),
+                                        frame->pkt_size,
+                                        frame->format,
+                                        frame->pts,
+                                        frame->key_frame,
+                                        frame->coded_picture_number); */
+
+                                    // For now, just write the first frame into
+                                    // a pgm file.
+                                    if (frame->format == AV_PIX_FMT_YUV420P) {
+                                        
+                                        // convert the frame into rgb
+                                        av_image_copy(video_data, video_linesize,
+                                            (const uint8_t **)frame->data, frame->linesize,
+                                            (AVPixelFormat) frame->format, 
+                                            frame->width, frame->height);
+
+                                        // TODO do something with the data :/
                                     }
-
-                                    fclose(f);
-
-                                    printf("Success: First frame saved!\n");
                                 }
                             }
+                            
                         }
-                        
                     }
-                }
 
-                av_packet_unref(packet);
+                    av_packet_unref(packet);
+                }
             }
+            
+            av_freep(&video_data[0]);
         }
     }
 
+    printf("Exiting load video task.\n");
     delete vid_params;
     return (void*) nullptr;
 }
