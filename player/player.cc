@@ -163,6 +163,7 @@ void * play_video_thread (void* params) {
         AVFrame *frame = av_frame_alloc();
 
         // Initialize window here!
+        // Fuck sfml. It's asking me for too much >_>
 
         printf("\nBeginning Frame Extraction.\n");
 
