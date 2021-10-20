@@ -4,8 +4,10 @@
 #include <signal.h>
 #include <string>
 #include <iostream>
-#include "player/player.h"
 #include <vector>
+
+#include "player/player.h"
+#include "window/window.h"
 
 /**
  * Reference:
