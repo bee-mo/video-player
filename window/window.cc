@@ -12,6 +12,9 @@ void window::init(int width, int height) {
         return;
     }
 
+    width_ = width;
+    height_ = height;
+
     glfwWindowHint(GLFW_SAMPLES, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -78,19 +81,32 @@ void window::init(int width, int height) {
         -OFF_,   -OFF_,   0.0f,     0.0f,  0.0f
     };
 
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    // GLuint vbo;
+    glGenBuffers(1, &vbo_);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
     glBufferData(GL_ARRAY_BUFFER, sizeof(screen_rect), screen_rect, GL_STATIC_DRAW);
 
-    GLuint pos_location = glGetAttribLocation(shader_id_, "vertexPosition_modelspace");
-    glEnableVertexAttribArray(pos_location);
-    glVertexAttribPointer(pos_location, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+    pos_location_ = glGetAttribLocation(shader_id_, "vertexPosition_modelspace");
+    glEnableVertexAttribArray(pos_location_);
+    glVertexAttribPointer(pos_location_, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
 
-    GLuint img_location = glGetAttribLocation(shader_id_, "vertexUV");
-    glEnableVertexAttribArray(img_location);
-    glVertexAttribPointer(img_location, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(3*sizeof(float)));
+    img_location_ = glGetAttribLocation(shader_id_, "vertexUV");
+    glEnableVertexAttribArray(img_location_);
+    glVertexAttribPointer(img_location_, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(3*sizeof(float)));
 
+    // generate random image
+    std::vector<uint8_t> img;
+    uint8_t byte_info;
+    const float den = RAND_MAX == 0? 1.0f : RAND_MAX * 1.0f;
+    for (int i = 0; i < width_ * height_ * 3; ++i) {
+        byte_info = (uint8_t) (((rand() * 1.0f)/den) * 255);
+        img.push_back(byte_info);
+    }
+    status = WINDOW_STATUS::OK;
+
+    // draw_image(&img[0], width_, height_);
+
+    /*
     GLuint image = window::generate_random_img(100, 100);
 
     glActiveTexture(GL_TEXTURE0);
@@ -105,19 +121,48 @@ void window::init(int width, int height) {
     glBindTexture(GL_TEXTURE_2D, image);
     glEnableVertexAttribArray(pos_location);
     glEnableVertexAttribArray(img_location);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glDisableVertexAttribArray(0);
     glfwSwapBuffers(gl_window_);
-
-    status = WINDOW_STATUS::OK;
+    */
 }
 
 void window::draw_image(const uint8_t *img_buffer, int width, int height) {
-    glClear(GL_COLOR_BUFFER_BIT);
-    glfwSwapBuffers(gl_window_);
+    if (status != WINDOW_STATUS::OK) {
+        fprintf(stderr, "Error: Window not initialized.\n");
+        return;
+    }
 
-    // TODO draw here :)
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
+        GL_UNSIGNED_BYTE, (const GLvoid *) img_buffer);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glUniform1i(glGetUniformLocation(shader_id_, "tex_sampler"), 0);
+
+    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(shader_id_);
+    glBindVertexArray(vao_);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glEnableVertexAttribArray(pos_location_);
+    glEnableVertexAttribArray(img_location_);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDisableVertexAttribArray(0);
+
+    glfwSwapBuffers(gl_window_);
 }
 
 GLuint window::generate_random_img(int width, int height) {
@@ -136,8 +181,8 @@ GLuint window::generate_random_img(int width, int height) {
         GL_FLOAT, (const GLvoid *) &img_buff[0]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     return tex;
 }
 

@@ -174,13 +174,18 @@ void * play_video_thread (void* params) {
             uint8_t *video_data[4];
             int video_linesize[4];
 
+            const uint WIDTH {640};
+            const uint HEIGHT {360};
             int video_data_size = av_image_alloc(
                 video_data, video_linesize,
-                640, 360, AV_PIX_FMT_RGB24, 1
+                WIDTH, HEIGHT, AV_PIX_FMT_RGB24, 1
             );
             if (video_data_size < 0) {
                 fprintf(stderr, "Error: Failed to initialize video image buffer.\n");
             } else {
+
+                window win;
+                win.init(WIDTH, HEIGHT);
                 while (av_read_frame(
                     vid_params->player->format_ctx_,
                     packet
@@ -220,7 +225,8 @@ void * play_video_thread (void* params) {
                                             (AVPixelFormat) frame->format, 
                                             frame->width, frame->height);
 
-                                        // TODO do something with the data :/
+                                        win.draw_image((const uint8_t *)video_data[0], 
+                                            WIDTH, HEIGHT);
                                     }
                                 }
                             }

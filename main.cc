@@ -18,7 +18,7 @@ void handle_signal(int signal);
 void help_prompt();
 std::vector<std::string> tokenize(const std::string& line);
 
-int main(int argc, char **argv) {
+int main_(int argc, char **argv) {
     window win;
     win.init(600, 400);
 
@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     return 1;
 }
 
-int main_ (int argc, char **argv) {
+int main (int argc, char **argv) {
 
     signal(SIGTERM, handle_signal);
     signal(SIGINT, handle_signal);

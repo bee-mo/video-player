@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <mutex>
 #include <pthread.h>
+#include "../window/window.h"
 
 // #include <libavcodec/codec_id.h>
 // #include <libavutil/avutil.h>

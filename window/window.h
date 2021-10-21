@@ -41,7 +41,10 @@ private:
     GLFWwindow *gl_window_;
     WINDOW_STATUS status;
     GLuint shader_id_;
-    GLuint vao_;
+    GLuint vao_, vbo_,
+        pos_location_,
+        img_location_;
+    uint width_, height_;
 
     /**
      * @def
