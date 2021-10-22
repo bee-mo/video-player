@@ -61,6 +61,10 @@ int main (int argc, char **argv) {
             } else {
                 player.load_file(tokens[1]);
             }
+        } else if (tokens[0].compare("pause") == 0) {
+            player.pause();
+        } else if (tokens[0].compare("resume") == 0) {
+            player.resume();
         } else if (tokens[0].compare("exit") == 0) {
             printf("Terminating Program.\n");
             break;
@@ -86,6 +90,8 @@ void handle_signal(int signal) {
 void help_prompt() {
     printf("-- [Help] --\n");
     printf("\tload <path_to_file>\tLoad a file into the video player.\n");
+    printf("\tpause\tPause the video, if there is a video loaded.\n");
+    printf("\tresume\tUnpause the video, if there is a video loaded.\n");
 
     printf("\texit\t\tExit the program.\n");
 }
@@ -102,8 +108,7 @@ std::vector<std::string> tokenize(const std::string& line) {
                 tokens.push_back(line.substr(start, end-start));
             start = end+1;
             end = start;
-        }
-        else {
+        } else {
             ++end;
         }
 

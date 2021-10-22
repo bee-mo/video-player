@@ -126,6 +126,7 @@ void window::init(int width, int height) {
     glDisableVertexAttribArray(0);
     glfwSwapBuffers(gl_window_);
     */
+    glfwPollEvents();
 }
 
 void window::draw_image(const uint8_t *img_buffer, int width, int height) {
@@ -163,6 +164,7 @@ void window::draw_image(const uint8_t *img_buffer, int width, int height) {
     glDisableVertexAttribArray(0);
 
     glfwSwapBuffers(gl_window_);
+    glfwPollEvents();
 }
 
 GLuint window::generate_random_img(int width, int height) {

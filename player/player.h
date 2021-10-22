@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <mutex>
+#include <vector>
+#include <chrono>
 #include <pthread.h>
 #include "../window/window.h"
 
@@ -26,7 +28,7 @@ void * play_video_thread (void* params);
 class Player {
 
 public:
-    Player () = default;
+    Player () : in_use_(false), paused_(false) {}
     ~Player();
 
     /**
@@ -34,6 +36,9 @@ public:
      * video player.
      * */
     void load_file(const std::string& path);
+    
+    void pause();
+    void resume();
 
 private:
 
@@ -43,10 +48,25 @@ private:
      * */
     std::mutex fmt_mtx_;
     AVFormatContext *format_ctx_ = nullptr;
+    /**
+     * @def
+     * true => player is busy playing a video.
+     * false => player not playing a video.
+     * */
+    bool in_use_;
+    bool paused_;
+    std::mutex paused_mtx_;
 
     friend void * play_video_thread (void* params);
 };
 
 bool file_exists (const char* filepath);
+/**
+ * @def
+ * Given an image buffer, [buf], given in RGB format,
+ * rearrange the bytes such that the image is flipped
+ * upside down.
+ * */
+void flip_img (uint8_t *buff, int width, int height);
 
 #endif

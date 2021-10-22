@@ -1,11 +1,36 @@
 #include "player.h"
 
-Player::~Player () {
+Player::~Player () {}
+
+void Player::pause () {
+    if (!in_use_) {
+        printf("No video to pause.\n");
+        return;
+    }
+    std::lock_guard<std::mutex> lock(paused_mtx_);
+    if (!paused_) {
+        paused_ = true;
+    }
+}
+
+void Player::resume () {
+    if (!in_use_) {
+        printf("No video to resume.\n");
+        return;
+    }
+    std::lock_guard<std::mutex> lock(paused_mtx_);
+    if (paused_) {
+        paused_ = false;
+    }
 }
 
 void Player::load_file(const std::string& path) {
-    const std::lock_guard<std::mutex> lock(fmt_mtx_);
+    if (in_use_) {
+        printf("Player is in use. Type \"end\" to stop the player.\n");
+        return;
+    }
 
+    const std::lock_guard<std::mutex> lock(fmt_mtx_);
     printf("Loading file:\t%s\n", path.c_str());
 
     if (!file_exists(path.c_str())) {
@@ -139,6 +164,8 @@ void Player::load_file(const std::string& path) {
         avformat_close_input(&format_ctx_);
     } else {
 
+        in_use_ = true;
+
         auto *vid_params = new VideoInfo;
         vid_params->player = this;
         vid_params->stream_index = stream_index;
@@ -157,7 +184,9 @@ void Player::load_file(const std::string& path) {
 void * play_video_thread (void* params) {
     // TODO play the video information
     struct VideoInfo *vid_params = (VideoInfo*) params;
-    if (vid_params->player != nullptr) {
+    if (vid_params->player != nullptr
+        && vid_params->stream_index >= 0
+        && vid_params->stream_index < vid_params->player->format_ctx_->nb_streams) {
         const std::lock_guard<std::mutex> fmt_lock(vid_params->player->fmt_mtx_);
         AVPacket *packet = av_packet_alloc();
         AVFrame *frame = av_frame_alloc();
@@ -186,6 +215,15 @@ void * play_video_thread (void* params) {
 
                 window win;
                 win.init(WIDTH, HEIGHT);
+                std::vector<uint8_t> vid_data_2;
+                // vid_data_2.resize(WIDTH * HEIGHT * 3);
+                auto frame_rate_rat = 
+                    vid_params->player->format_ctx_->streams[vid_params->stream_index]->r_frame_rate;
+                auto frame_rate = av_q2d(frame_rate_rat);
+                if (frame_rate == 0) frame_rate = (double) 1.0f;
+
+                auto last_frame_time = std::chrono::system_clock::now();
+
                 while (av_read_frame(
                     vid_params->player->format_ctx_,
                     packet
@@ -214,19 +252,39 @@ void * play_video_thread (void* params) {
                                         frame->pts,
                                         frame->key_frame,
                                         frame->coded_picture_number); */
-
-                                    // For now, just write the first frame into
-                                    // a pgm file.
                                     if (frame->format == AV_PIX_FMT_YUV420P) {
-                                        
                                         // convert the frame into rgb
                                         av_image_copy(video_data, video_linesize,
                                             (const uint8_t **)frame->data, frame->linesize,
                                             (AVPixelFormat) frame->format, 
                                             frame->width, frame->height);
 
-                                        win.draw_image((const uint8_t *)video_data[0], 
+                                        for (int i = 0; i < WIDTH * HEIGHT * 3; ++i) {
+                                            int line_i = i % (frame->linesize[0] * 3);
+                                            if (line_i >= WIDTH) {
+                                                continue;
+                                            }
+                                            for (int j = 0; j < 3; ++j) {
+                                                vid_data_2.push_back(video_data[0][i]);
+                                            }
+                                        }
+
+                                        while (true) {
+                                            std::lock_guard<std::mutex> lock(vid_params->player->paused_mtx_);
+                                            if (!vid_params->player->paused_) 
+                                                break;
+                                        }
+
+                                        std::chrono::duration<float> diff;
+                                        do {
+                                            diff = std::chrono::system_clock::now() - last_frame_time;
+                                        } while (diff.count() < 1.0f/frame_rate);
+
+                                        flip_img(&vid_data_2[0], WIDTH, HEIGHT);
+                                        win.draw_image((const uint8_t *)&vid_data_2[0], 
                                             WIDTH, HEIGHT);
+                                        vid_data_2.clear();
+                                        last_frame_time = std::chrono::system_clock::now();
                                     }
                                 }
                             }
@@ -250,4 +308,20 @@ void * play_video_thread (void* params) {
 bool file_exists (const char* filepath) {
     struct stat buff;
     return stat(filepath, &buff) == 0;
+}
+
+void flip_img (uint8_t *buff, int width, int height) {
+
+    int line_a {0}, line_b {height - 1};
+
+    while (line_a < line_b) {
+
+        for (int i = 0; i < width * 3; ++i) {
+            auto temp = buff[(line_a * width * 3) + i];
+            buff[(line_a * width * 3) + i] = buff[(line_b * width * 3) + i];
+            buff[(line_b * width * 3) + i] = temp;
+        }
+        ++line_a; --line_b;
+    }
+
 }
