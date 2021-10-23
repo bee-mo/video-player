@@ -73,12 +73,12 @@ void window::init(int width, int height) {
 
     #define OFF_ 1.0f
     const GLfloat screen_rect[] = {
-        -OFF_,  -OFF_,  0.0f,       0.0f,  0.0f,
-        OFF_,   -OFF_,  0.0f,       1.0f,   0.0f,
-        OFF_,   OFF_,   0.0f,       1.0f,   1.0f,
-        OFF_,   OFF_,   0.0f,       1.0f,   1.0f,
-        -OFF_,  OFF_,   0.0f,       0.0f,  1.0f,
-        -OFF_,   -OFF_,   0.0f,     0.0f,  0.0f
+        -OFF_,  -OFF_,  0.0f,       0.0f,  1.0f,
+        OFF_,   -OFF_,  0.0f,       1.0f,   1.0f,
+        OFF_,   OFF_,   0.0f,       1.0f,   0.0f,
+        OFF_,   OFF_,   0.0f,       1.0f,   0.0f,
+        -OFF_,  OFF_,   0.0f,       0.0f,  0.0f,
+        -OFF_,   -OFF_,   0.0f,     0.0f,  1.0f
     };
 
     // GLuint vbo;

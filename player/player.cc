@@ -223,7 +223,11 @@ void * play_video_thread (void* params) {
             if (frame_rate == 0) frame_rate = (double) 1.0f;
             auto last_frame_time = std::chrono::system_clock::now();
 
-            while (av_read_frame(
+            bool supported_pixel_format {true};
+
+            while (
+                supported_pixel_format
+                && av_read_frame(
                 vid_params->player->format_ctx_,
                 packet
             ) >= 0) {
@@ -263,7 +267,6 @@ void * play_video_thread (void* params) {
                                             break;
                                     }
 
-                                    flip_img(dst_img_buff[0], WIDTH, HEIGHT);
                                     std::chrono::duration<float> diff;
                                     do {
                                         diff = std::chrono::system_clock::now() - last_frame_time;
@@ -272,6 +275,14 @@ void * play_video_thread (void* params) {
                                     win.draw_image((const uint8_t *)dst_img_buff[0], 
                                         WIDTH, HEIGHT);
                                     last_frame_time = std::chrono::system_clock::now();
+                                } else {
+                                    auto format_desc = av_pix_fmt_desc_get((AVPixelFormat) frame->format);
+
+                                    fprintf(stderr, "Error: Pixel format [%s] is not supported...",
+                                        format_desc == nullptr ? "null" : format_desc->name);
+                                    fprintf(stderr, "Terminating player.\n");
+                                    supported_pixel_format = false;
+                                    break;
                                 }
                             }
                         }
