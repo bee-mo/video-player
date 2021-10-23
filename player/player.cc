@@ -191,112 +191,99 @@ void * play_video_thread (void* params) {
         AVPacket *packet = av_packet_alloc();
         AVFrame *frame = av_frame_alloc();
 
+        // create swscale context for converting from yuv to rgb
+        const uint WIDTH {640};
+        const uint HEIGHT {360};
+        struct SwsContext *sws_ctx = sws_getContext(
+            WIDTH, HEIGHT, AV_PIX_FMT_YUV420P,
+            WIDTH, HEIGHT, AV_PIX_FMT_RGB24,
+            SWS_BILINEAR, nullptr, nullptr, nullptr);
+        uint8_t *dst_img_buff[4];
+        int dst_linesize[4];
+        auto dst_buffsize = av_image_alloc(dst_img_buff, dst_linesize,
+            WIDTH, HEIGHT, AV_PIX_FMT_RGB24, 1);
+
         // Initialize window here!
         // Fuck sfml. It's asking me for too much >_>
 
         printf("\nBeginning Frame Extraction.\n");
 
         if (packet == nullptr || frame == nullptr) {
-               fprintf(stderr, "Error: Failed to initialize packet or frame.\n");
+           fprintf(stderr, "Error: Failed to initialize packet or frame.\n");
+        } else if (sws_ctx == nullptr) {
+            fprintf(stderr, "Error: Failed to initialize swscale.\n");
+        } else if (dst_buffsize < 0) {
+            fprintf(stderr, "Error: Failed to allocate av iamge buffer.\n");
         } else {
+            window win;
+            win.init(WIDTH, HEIGHT);
+            auto frame_rate_rat = 
+                vid_params->player->format_ctx_->streams[vid_params->stream_index]->r_frame_rate;
+            auto frame_rate = av_q2d(frame_rate_rat);
+            if (frame_rate == 0) frame_rate = (double) 1.0f;
+            auto last_frame_time = std::chrono::system_clock::now();
 
-            uint8_t *video_data[4];
-            int video_linesize[4];
+            while (av_read_frame(
+                vid_params->player->format_ctx_,
+                packet
+            ) >= 0) {
 
-            const uint WIDTH {640};
-            const uint HEIGHT {360};
-            int video_data_size = av_image_alloc(
-                video_data, video_linesize,
-                WIDTH, HEIGHT, AV_PIX_FMT_RGB24, 1
-            );
-            if (video_data_size < 0) {
-                fprintf(stderr, "Error: Failed to initialize video image buffer.\n");
-            } else {
+                if (packet->stream_index == vid_params->stream_index) {
 
-                window win;
-                win.init(WIDTH, HEIGHT);
-                std::vector<uint8_t> vid_data_2;
-                // vid_data_2.resize(WIDTH * HEIGHT * 3);
-                auto frame_rate_rat = 
-                    vid_params->player->format_ctx_->streams[vid_params->stream_index]->r_frame_rate;
-                auto frame_rate = av_q2d(frame_rate_rat);
-                if (frame_rate == 0) frame_rate = (double) 1.0f;
+                    // decode the packet into a frame
+                    int res = avcodec_send_packet(vid_params->codec_ctx, packet);
+                    if (res < 0) {
+                        fprintf(stderr, "Error while sending packet to decoder.\n");
+                    } else {
 
-                auto last_frame_time = std::chrono::system_clock::now();
+                        while (res >= 0) {
+                            res = avcodec_receive_frame(vid_params->codec_ctx, frame);
 
-                while (av_read_frame(
-                    vid_params->player->format_ctx_,
-                    packet
-                ) >= 0) {
+                            if (res == AVERROR(EAGAIN) || res == AVERROR_EOF) {
+                                break;
+                            } else if (res >= 0) {
+                                /* printf("Frame %d (size=%d bytes, format=%d) "
+                                    "pts %ld key_frame %d dts %d\n",
+                                    vid_params->codec_ctx->frame_number,
+                                    // av_get_picture_type_char(frame->pict_type),
+                                    frame->pkt_size,
+                                    frame->format,
+                                    frame->pts,
+                                    frame->key_frame,
+                                    frame->coded_picture_number); */
+                                if (frame->format == AV_PIX_FMT_YUV420P) {
+                                    // convert the frame into rgb
+                                    
+                                    sws_scale(sws_ctx, frame->data, frame->linesize,
+                                        0, frame->height, dst_img_buff, dst_linesize);
 
-                    if (packet->stream_index == vid_params->stream_index) {
-
-                        // decode the packet into a frame
-                        int res = avcodec_send_packet(vid_params->codec_ctx, packet);
-                        if (res < 0) {
-                            fprintf(stderr, "Error while sending packet to decoder.\n");
-                        } else {
-
-                            while (res >= 0) {
-                                res = avcodec_receive_frame(vid_params->codec_ctx, frame);
-
-                                if (res == AVERROR(EAGAIN) || res == AVERROR_EOF) {
-                                    break;
-                                } else if (res >= 0) {
-                                    /* printf("Frame %d (size=%d bytes, format=%d) "
-                                        "pts %ld key_frame %d dts %d\n",
-                                        vid_params->codec_ctx->frame_number,
-                                        // av_get_picture_type_char(frame->pict_type),
-                                        frame->pkt_size,
-                                        frame->format,
-                                        frame->pts,
-                                        frame->key_frame,
-                                        frame->coded_picture_number); */
-                                    if (frame->format == AV_PIX_FMT_YUV420P) {
-                                        // convert the frame into rgb
-                                        av_image_copy(video_data, video_linesize,
-                                            (const uint8_t **)frame->data, frame->linesize,
-                                            (AVPixelFormat) frame->format, 
-                                            frame->width, frame->height);
-
-                                        for (int i = 0; i < WIDTH * HEIGHT * 3; ++i) {
-                                            int line_i = i % (frame->linesize[0] * 3);
-                                            if (line_i >= WIDTH) {
-                                                continue;
-                                            }
-                                            for (int j = 0; j < 3; ++j) {
-                                                vid_data_2.push_back(video_data[0][i]);
-                                            }
-                                        }
-
-                                        while (true) {
-                                            std::lock_guard<std::mutex> lock(vid_params->player->paused_mtx_);
-                                            if (!vid_params->player->paused_) 
-                                                break;
-                                        }
-
-                                        std::chrono::duration<float> diff;
-                                        do {
-                                            diff = std::chrono::system_clock::now() - last_frame_time;
-                                        } while (diff.count() < 1.0f/frame_rate);
-
-                                        flip_img(&vid_data_2[0], WIDTH, HEIGHT);
-                                        win.draw_image((const uint8_t *)&vid_data_2[0], 
-                                            WIDTH, HEIGHT);
-                                        vid_data_2.clear();
-                                        last_frame_time = std::chrono::system_clock::now();
+                                    while (true) {
+                                        std::lock_guard<std::mutex> lock(vid_params->player->paused_mtx_);
+                                        if (!vid_params->player->paused_) 
+                                            break;
                                     }
+
+                                    flip_img(dst_img_buff[0], WIDTH, HEIGHT);
+                                    std::chrono::duration<float> diff;
+                                    do {
+                                        diff = std::chrono::system_clock::now() - last_frame_time;
+                                    } while (diff.count() < 1.0f/frame_rate);
+
+                                    win.draw_image((const uint8_t *)dst_img_buff[0], 
+                                        WIDTH, HEIGHT);
+                                    last_frame_time = std::chrono::system_clock::now();
                                 }
                             }
-                            
                         }
+                        
                     }
-
-                    av_packet_unref(packet);
                 }
+
+                av_packet_unref(packet);
             }
-            
-            av_freep(&video_data[0]);
+
+            av_freep(&dst_img_buff[0]);
+            sws_freeContext(sws_ctx);
         }
     }
 
